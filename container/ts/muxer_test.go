@@ -3,7 +3,7 @@ package ts
 import (
 	"testing"
 
-	"github.com/gwuhaolin/livego/av"
+	"github.com/zhyoulun/livego/av"
 
 	"github.com/stretchr/testify/assert"
 )

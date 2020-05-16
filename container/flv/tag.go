@@ -3,7 +3,7 @@ package flv
 import (
 	"fmt"
 
-	"github.com/gwuhaolin/livego/av"
+	"github.com/zhyoulun/livego/av"
 )
 
 type flvTag struct {
