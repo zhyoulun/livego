@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	readTimeout  = configure.Config.GetInt("read_timeout")
+	//readTimeout  = configure.Config.GetInt("read_timeout")
 	writeTimeout = configure.Config.GetInt("write_timeout")
 )
 
@@ -33,47 +33,47 @@ type Client struct {
 	getter  av.GetWriter
 }
 
-func NewRtmpClient(h av.Handler, getter av.GetWriter) *Client {
-	return &Client{
-		handler: h,
-		getter:  getter,
-	}
-}
+//func NewRtmpClient(h av.Handler, getter av.GetWriter) *Client {
+//	return &Client{
+//		handler: h,
+//		getter:  getter,
+//	}
+//}
 
-func (c *Client) Dial(url string, method string) error {
-	connClient := core.NewConnClient()
-	if err := connClient.Start(url, method); err != nil {
-		return err
-	}
-	if method == av.PUBLISH {
-		writer := NewVirWriter(connClient)
-		log.Debugf("client Dial call NewVirWriter url=%s, method=%s", url, method)
-		c.handler.HandleWriter(writer)
-	} else if method == av.PLAY {
-		reader := NewVirReader(connClient)
-		log.Debugf("client Dial call NewVirReader url=%s, method=%s", url, method)
-		c.handler.HandleReader(reader)
-		if c.getter != nil {
-			writer := c.getter.GetWriter(reader.Info())
-			c.handler.HandleWriter(writer)
-		}
-	}
-	return nil
-}
+//func (c *Client) Dial(url string, method string) error {
+//	connClient := core.NewConnClient()
+//	if err := connClient.Start(url, method); err != nil {
+//		return err
+//	}
+//	if method == av.PUBLISH {
+//		writer := NewVirWriter(connClient)
+//		log.Debugf("client Dial call NewVirWriter url=%s, method=%s", url, method)
+//		c.handler.HandleWriter(writer)
+//	} else if method == av.PLAY {
+//		reader := NewVirReader(connClient)
+//		log.Debugf("client Dial call NewVirReader url=%s, method=%s", url, method)
+//		c.handler.HandleReader(reader)
+//		if c.getter != nil {
+//			writer := c.getter.GetWriter(reader.Info())
+//			c.handler.HandleWriter(writer)
+//		}
+//	}
+//	return nil
+//}
 
-func (c *Client) GetHandle() av.Handler {
-	return c.handler
-}
+//func (c *Client) GetHandle() av.Handler {
+//	return c.handler
+//}
 
 type Server struct {
 	handler av.Handler
-	getter  av.GetWriter
+	//getter  av.GetWriter
 }
 
 func NewRtmpServer(h av.Handler, getter av.GetWriter) *Server {
 	return &Server{
 		handler: h,
-		getter:  getter,
+		//getter:  getter,
 	}
 }
 
@@ -98,6 +98,7 @@ func (s *Server) Serve(listener net.Listener) (err error) {
 }
 
 func (s *Server) handleConn(conn *core.Conn) error {
+	//握手
 	if err := conn.HandshakeServer(); err != nil {
 		conn.Close()
 		log.Error("handleConn HandshakeServer err: ", err)
@@ -137,14 +138,17 @@ func (s *Server) handleConn(conn *core.Conn) error {
 		s.handler.HandleReader(reader)
 		log.Debugf("new publisher: %+v", reader.Info())
 
-		if s.getter != nil {
-			writeType := reflect.TypeOf(s.getter)
-			log.Debugf("handleConn:writeType=%v", writeType)
-			writer := s.getter.GetWriter(reader.Info())
-			s.handler.HandleWriter(writer)
-		}
-		flvWriter := new(flv.FlvDvr)
-		s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
+		//hls
+		//if s.getter != nil {
+		//	writeType := reflect.TypeOf(s.getter)
+		//	log.Debugf("handleConn:writeType=%v", writeType)
+		//	writer := s.getter.GetWriter(reader.Info())
+		//	s.handler.HandleWriter(writer)
+		//}
+
+		//dvr
+		//flvWriter := new(flv.FlvDvr)
+		//s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
 	} else {
 		writer := NewVirWriter(connServer)
 		log.Debugf("new player: %+v", writer.Info())
@@ -405,6 +409,8 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 	}()
 
 	v.SetPreTime()
+
+	//get chunk stream
 	var cs core.ChunkStream
 	for {
 		err = v.conn.Read(&cs)
@@ -419,6 +425,7 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 		}
 	}
 
+	//change chunk stream to av packet
 	p.IsAudio = cs.TypeID == av.TAG_AUDIO
 	p.IsVideo = cs.TypeID == av.TAG_VIDEO
 	p.IsMetadata = cs.TypeID == av.TAG_SCRIPTDATAAMF0 || cs.TypeID == av.TAG_SCRIPTDATAAMF3
@@ -427,7 +434,10 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 	p.TimeStamp = cs.Timestamp
 
 	v.SaveStatics(p.StreamID, uint64(len(p.Data)), p.IsVideo)
+
+	//
 	v.demuxer.DemuxH(p)
+
 	return err
 }
 

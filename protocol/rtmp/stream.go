@@ -2,15 +2,12 @@ package rtmp
 
 import (
 	"fmt"
-	"strings"
 	"time"
-
-	"github.com/zhyoulun/livego/av"
-	"github.com/zhyoulun/livego/protocol/rtmp/cache"
-	"github.com/zhyoulun/livego/protocol/rtmp/rtmprelay"
 
 	cmap "github.com/orcaman/concurrent-map"
 	log "github.com/sirupsen/logrus"
+	"github.com/zhyoulun/livego/av"
+	"github.com/zhyoulun/livego/protocol/rtmp/cache"
 )
 
 var (
@@ -149,161 +146,161 @@ func (s *Stream) AddWriter(w av.WriteCloser) {
 
 /*检测本application下是否配置static_push,
 如果配置, 启动push远端的连接*/
-func (s *Stream) StartStaticPush() {
-	key := s.info.Key
+//func (s *Stream) StartStaticPush() {
+//	key := s.info.Key
+//
+//	dscr := strings.Split(key, "/")
+//	if len(dscr) < 1 {
+//		return
+//	}
+//
+//	index := strings.Index(key, "/")
+//	if index < 0 {
+//		return
+//	}
+//
+//	streamname := key[index+1:]
+//	appname := dscr[0]
+//
+//	log.Debugf("StartStaticPush: current streamname=%s， appname=%s", streamname, appname)
+//	pushurllist, err := rtmprelay.GetStaticPushList(appname)
+//	if err != nil || len(pushurllist) < 1 {
+//		log.Debugf("StartStaticPush: GetStaticPushList error=%v", err)
+//		return
+//	}
+//
+//	for _, pushurl := range pushurllist {
+//		pushurl := pushurl + "/" + streamname
+//		log.Debugf("StartStaticPush: static pushurl=%s", pushurl)
+//
+//		staticpushObj := rtmprelay.GetAndCreateStaticPushObject(pushurl)
+//		if staticpushObj != nil {
+//			if err := staticpushObj.Start(); err != nil {
+//				log.Debugf("StartStaticPush: staticpushObj.Start %s error=%v", pushurl, err)
+//			} else {
+//				log.Debugf("StartStaticPush: staticpushObj.Start %s ok", pushurl)
+//			}
+//		} else {
+//			log.Debugf("StartStaticPush GetStaticPushObject %s error", pushurl)
+//		}
+//	}
+//}
 
-	dscr := strings.Split(key, "/")
-	if len(dscr) < 1 {
-		return
-	}
+//func (s *Stream) StopStaticPush() {
+//	key := s.info.Key
+//
+//	log.Debugf("StopStaticPush......%s", key)
+//	dscr := strings.Split(key, "/")
+//	if len(dscr) < 1 {
+//		return
+//	}
+//
+//	index := strings.Index(key, "/")
+//	if index < 0 {
+//		return
+//	}
+//
+//	streamname := key[index+1:]
+//	appname := dscr[0]
+//
+//	log.Debugf("StopStaticPush: current streamname=%s， appname=%s", streamname, appname)
+//	pushurllist, err := rtmprelay.GetStaticPushList(appname)
+//	if err != nil || len(pushurllist) < 1 {
+//		log.Debugf("StopStaticPush: GetStaticPushList error=%v", err)
+//		return
+//	}
+//
+//	for _, pushurl := range pushurllist {
+//		pushurl := pushurl + "/" + streamname
+//		log.Debugf("StopStaticPush: static pushurl=%s", pushurl)
+//
+//		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
+//		if (staticpushObj != nil) && (err == nil) {
+//			staticpushObj.Stop()
+//			rtmprelay.ReleaseStaticPushObject(pushurl)
+//			log.Debugf("StopStaticPush: staticpushObj.Stop %s ", pushurl)
+//		} else {
+//			log.Debugf("StopStaticPush GetStaticPushObject %s error", pushurl)
+//		}
+//	}
+//}
 
-	index := strings.Index(key, "/")
-	if index < 0 {
-		return
-	}
+//func (s *Stream) IsSendStaticPush() bool {
+//	key := s.info.Key
+//
+//	dscr := strings.Split(key, "/")
+//	if len(dscr) < 1 {
+//		return false
+//	}
+//
+//	appname := dscr[0]
+//
+//	//log.Debugf("SendStaticPush: current streamname=%s， appname=%s", streamname, appname)
+//	pushurllist, err := rtmprelay.GetStaticPushList(appname)
+//	if err != nil || len(pushurllist) < 1 {
+//		//log.Debugf("SendStaticPush: GetStaticPushList error=%v", err)
+//		return false
+//	}
+//
+//	index := strings.Index(key, "/")
+//	if index < 0 {
+//		return false
+//	}
+//
+//	streamname := key[index+1:]
+//
+//	for _, pushurl := range pushurllist {
+//		pushurl := pushurl + "/" + streamname
+//		//log.Debugf("SendStaticPush: static pushurl=%s", pushurl)
+//
+//		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
+//		if (staticpushObj != nil) && (err == nil) {
+//			return true
+//			//staticpushObj.WriteAvPacket(&packet)
+//			//log.Debugf("SendStaticPush: WriteAvPacket %s ", pushurl)
+//		} else {
+//			log.Debugf("SendStaticPush GetStaticPushObject %s error", pushurl)
+//		}
+//	}
+//	return false
+//}
 
-	streamname := key[index+1:]
-	appname := dscr[0]
-
-	log.Debugf("StartStaticPush: current streamname=%s， appname=%s", streamname, appname)
-	pushurllist, err := rtmprelay.GetStaticPushList(appname)
-	if err != nil || len(pushurllist) < 1 {
-		log.Debugf("StartStaticPush: GetStaticPushList error=%v", err)
-		return
-	}
-
-	for _, pushurl := range pushurllist {
-		pushurl := pushurl + "/" + streamname
-		log.Debugf("StartStaticPush: static pushurl=%s", pushurl)
-
-		staticpushObj := rtmprelay.GetAndCreateStaticPushObject(pushurl)
-		if staticpushObj != nil {
-			if err := staticpushObj.Start(); err != nil {
-				log.Debugf("StartStaticPush: staticpushObj.Start %s error=%v", pushurl, err)
-			} else {
-				log.Debugf("StartStaticPush: staticpushObj.Start %s ok", pushurl)
-			}
-		} else {
-			log.Debugf("StartStaticPush GetStaticPushObject %s error", pushurl)
-		}
-	}
-}
-
-func (s *Stream) StopStaticPush() {
-	key := s.info.Key
-
-	log.Debugf("StopStaticPush......%s", key)
-	dscr := strings.Split(key, "/")
-	if len(dscr) < 1 {
-		return
-	}
-
-	index := strings.Index(key, "/")
-	if index < 0 {
-		return
-	}
-
-	streamname := key[index+1:]
-	appname := dscr[0]
-
-	log.Debugf("StopStaticPush: current streamname=%s， appname=%s", streamname, appname)
-	pushurllist, err := rtmprelay.GetStaticPushList(appname)
-	if err != nil || len(pushurllist) < 1 {
-		log.Debugf("StopStaticPush: GetStaticPushList error=%v", err)
-		return
-	}
-
-	for _, pushurl := range pushurllist {
-		pushurl := pushurl + "/" + streamname
-		log.Debugf("StopStaticPush: static pushurl=%s", pushurl)
-
-		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
-		if (staticpushObj != nil) && (err == nil) {
-			staticpushObj.Stop()
-			rtmprelay.ReleaseStaticPushObject(pushurl)
-			log.Debugf("StopStaticPush: staticpushObj.Stop %s ", pushurl)
-		} else {
-			log.Debugf("StopStaticPush GetStaticPushObject %s error", pushurl)
-		}
-	}
-}
-
-func (s *Stream) IsSendStaticPush() bool {
-	key := s.info.Key
-
-	dscr := strings.Split(key, "/")
-	if len(dscr) < 1 {
-		return false
-	}
-
-	appname := dscr[0]
-
-	//log.Debugf("SendStaticPush: current streamname=%s， appname=%s", streamname, appname)
-	pushurllist, err := rtmprelay.GetStaticPushList(appname)
-	if err != nil || len(pushurllist) < 1 {
-		//log.Debugf("SendStaticPush: GetStaticPushList error=%v", err)
-		return false
-	}
-
-	index := strings.Index(key, "/")
-	if index < 0 {
-		return false
-	}
-
-	streamname := key[index+1:]
-
-	for _, pushurl := range pushurllist {
-		pushurl := pushurl + "/" + streamname
-		//log.Debugf("SendStaticPush: static pushurl=%s", pushurl)
-
-		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
-		if (staticpushObj != nil) && (err == nil) {
-			return true
-			//staticpushObj.WriteAvPacket(&packet)
-			//log.Debugf("SendStaticPush: WriteAvPacket %s ", pushurl)
-		} else {
-			log.Debugf("SendStaticPush GetStaticPushObject %s error", pushurl)
-		}
-	}
-	return false
-}
-
-func (s *Stream) SendStaticPush(packet av.Packet) {
-	key := s.info.Key
-
-	dscr := strings.Split(key, "/")
-	if len(dscr) < 1 {
-		return
-	}
-
-	index := strings.Index(key, "/")
-	if index < 0 {
-		return
-	}
-
-	streamname := key[index+1:]
-	appname := dscr[0]
-
-	//log.Debugf("SendStaticPush: current streamname=%s， appname=%s", streamname, appname)
-	pushurllist, err := rtmprelay.GetStaticPushList(appname)
-	if err != nil || len(pushurllist) < 1 {
-		//log.Debugf("SendStaticPush: GetStaticPushList error=%v", err)
-		return
-	}
-
-	for _, pushurl := range pushurllist {
-		pushurl := pushurl + "/" + streamname
-		//log.Debugf("SendStaticPush: static pushurl=%s", pushurl)
-
-		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
-		if (staticpushObj != nil) && (err == nil) {
-			staticpushObj.WriteAvPacket(&packet)
-			//log.Debugf("SendStaticPush: WriteAvPacket %s ", pushurl)
-		} else {
-			log.Debugf("SendStaticPush GetStaticPushObject %s error", pushurl)
-		}
-	}
-}
+//func (s *Stream) SendStaticPush(packet av.Packet) {
+//	key := s.info.Key
+//
+//	dscr := strings.Split(key, "/")
+//	if len(dscr) < 1 {
+//		return
+//	}
+//
+//	index := strings.Index(key, "/")
+//	if index < 0 {
+//		return
+//	}
+//
+//	streamname := key[index+1:]
+//	appname := dscr[0]
+//
+//	//log.Debugf("SendStaticPush: current streamname=%s， appname=%s", streamname, appname)
+//	pushurllist, err := rtmprelay.GetStaticPushList(appname)
+//	if err != nil || len(pushurllist) < 1 {
+//		//log.Debugf("SendStaticPush: GetStaticPushList error=%v", err)
+//		return
+//	}
+//
+//	for _, pushurl := range pushurllist {
+//		pushurl := pushurl + "/" + streamname
+//		//log.Debugf("SendStaticPush: static pushurl=%s", pushurl)
+//
+//		staticpushObj, err := rtmprelay.GetStaticPushObject(pushurl)
+//		if (staticpushObj != nil) && (err == nil) {
+//			staticpushObj.WriteAvPacket(&packet)
+//			//log.Debugf("SendStaticPush: WriteAvPacket %s ", pushurl)
+//		} else {
+//			log.Debugf("SendStaticPush GetStaticPushObject %s error", pushurl)
+//		}
+//	}
+//}
 
 func (s *Stream) TransStart() {
 	s.isStart = true
@@ -311,7 +308,7 @@ func (s *Stream) TransStart() {
 
 	log.Debugf("TransStart: %v", s.info)
 
-	s.StartStaticPush()
+	//s.StartStaticPush()
 
 	for {
 		if !s.isStart {
@@ -325,14 +322,16 @@ func (s *Stream) TransStart() {
 			return
 		}
 
-		if s.IsSendStaticPush() {
-			s.SendStaticPush(p)
-		}
+		//if s.IsSendStaticPush() {
+		//	s.SendStaticPush(p)
+		//}
 
+		//publish先写到cache中
 		s.cache.Write(p)
 
 		for item := range s.ws.IterBuffered() {
 			v := item.Val.(*PackWriterCloser)
+			//如果还没有给sink发过包，则将cache中的数据发送过去
 			if !v.init {
 				//log.Debugf("cache.send: %v", v.w.Info())
 				if err = s.cache.Send(v.w); err != nil {
@@ -389,7 +388,7 @@ func (s *Stream) CheckAlive() (n int) {
 
 func (s *Stream) closeInter() {
 	if s.r != nil {
-		s.StopStaticPush()
+		//s.StopStaticPush()
 		log.Debugf("[%v] publisher closed", s.r.Info())
 	}
 

@@ -2,18 +2,15 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
-
-	"github.com/zhyoulun/livego/av"
-	"github.com/zhyoulun/livego/configure"
-	"github.com/zhyoulun/livego/protocol/rtmp"
-	"github.com/zhyoulun/livego/protocol/rtmp/rtmprelay"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/dgrijalva/jwt-go"
 	log "github.com/sirupsen/logrus"
+	"github.com/zhyoulun/livego/av"
+	"github.com/zhyoulun/livego/configure"
+	"github.com/zhyoulun/livego/protocol/rtmp"
 )
 
 type Response struct {
@@ -50,14 +47,14 @@ type ClientInfo struct {
 
 type Server struct {
 	handler  av.Handler
-	session  map[string]*rtmprelay.RtmpRelay
+	//session  map[string]*rtmprelay.RtmpRelay
 	rtmpAddr string
 }
 
 func NewServer(h av.Handler, rtmpAddr string) *Server {
 	return &Server{
 		handler:  h,
-		session:  make(map[string]*rtmprelay.RtmpRelay),
+		//session:  make(map[string]*rtmprelay.RtmpRelay),
 		rtmpAddr: rtmpAddr,
 	}
 }
@@ -105,12 +102,12 @@ func (s *Server) Serve(l net.Listener) error {
 
 	mux.Handle("/statics/", http.StripPrefix("/statics/", http.FileServer(http.Dir("statics"))))
 
-	mux.HandleFunc("/control/push", func(w http.ResponseWriter, r *http.Request) {
-		s.handlePush(w, r)
-	})
-	mux.HandleFunc("/control/pull", func(w http.ResponseWriter, r *http.Request) {
-		s.handlePull(w, r)
-	})
+	//mux.HandleFunc("/control/push", func(w http.ResponseWriter, r *http.Request) {
+	//	s.handlePush(w, r)
+	//})
+	//mux.HandleFunc("/control/pull", func(w http.ResponseWriter, r *http.Request) {
+	//	s.handlePull(w, r)
+	//})
 	mux.HandleFunc("/control/get", func(w http.ResponseWriter, r *http.Request) {
 		s.handleGet(w, r)
 	})
@@ -196,135 +193,135 @@ func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 }
 
 //http://127.0.0.1:8090/control/pull?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456
-func (s *Server) handlePull(w http.ResponseWriter, req *http.Request) {
-	var retString string
-	var err error
-
-	res := &Response{
-		w:      w,
-		Data:   nil,
-		Status: 200,
-	}
-
-	defer res.SendJson()
-
-	if req.ParseForm() != nil {
-		res.Status = 400
-		res.Data = "url: /control/pull?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456"
-		return
-	}
-
-	oper := req.Form.Get("oper")
-	app := req.Form.Get("app")
-	name := req.Form.Get("name")
-	url := req.Form.Get("url")
-
-	log.Debugf("control pull: oper=%v, app=%v, name=%v, url=%v", oper, app, name, url)
-	if (len(app) <= 0) || (len(name) <= 0) || (len(url) <= 0) {
-		res.Status = 400
-		res.Data = "control push parameter error, please check them."
-		return
-	}
-
-	remoteurl := "rtmp://127.0.0.1" + s.rtmpAddr + "/" + app + "/" + name
-	localurl := url
-
-	keyString := "pull:" + app + "/" + name
-	if oper == "stop" {
-		pullRtmprelay, found := s.session[keyString]
-
-		if !found {
-			retString = fmt.Sprintf("session key[%s] not exist, please check it again.", keyString)
-			res.Status = 400
-			res.Data = retString
-			return
-		}
-		log.Debugf("rtmprelay stop push %s from %s", remoteurl, localurl)
-		pullRtmprelay.Stop()
-
-		delete(s.session, keyString)
-		retString = fmt.Sprintf("<h1>push url stop %s ok</h1></br>", url)
-		res.Status = 400
-		res.Data = retString
-		log.Debugf("pull stop return %s", retString)
-	} else {
-		pullRtmprelay := rtmprelay.NewRtmpRelay(&localurl, &remoteurl)
-		log.Debugf("rtmprelay start push %s from %s", remoteurl, localurl)
-		err = pullRtmprelay.Start()
-		if err != nil {
-			retString = fmt.Sprintf("push error=%v", err)
-		} else {
-			s.session[keyString] = pullRtmprelay
-			retString = fmt.Sprintf("<h1>push url start %s ok</h1></br>", url)
-		}
-		res.Status = 400
-		res.Data = retString
-		log.Debugf("pull start return %s", retString)
-	}
-}
+//func (s *Server) handlePull(w http.ResponseWriter, req *http.Request) {
+//	var retString string
+//	var err error
+//
+//	res := &Response{
+//		w:      w,
+//		Data:   nil,
+//		Status: 200,
+//	}
+//
+//	defer res.SendJson()
+//
+//	if req.ParseForm() != nil {
+//		res.Status = 400
+//		res.Data = "url: /control/pull?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456"
+//		return
+//	}
+//
+//	oper := req.Form.Get("oper")
+//	app := req.Form.Get("app")
+//	name := req.Form.Get("name")
+//	url := req.Form.Get("url")
+//
+//	log.Debugf("control pull: oper=%v, app=%v, name=%v, url=%v", oper, app, name, url)
+//	if (len(app) <= 0) || (len(name) <= 0) || (len(url) <= 0) {
+//		res.Status = 400
+//		res.Data = "control push parameter error, please check them."
+//		return
+//	}
+//
+//	remoteurl := "rtmp://127.0.0.1" + s.rtmpAddr + "/" + app + "/" + name
+//	localurl := url
+//
+//	keyString := "pull:" + app + "/" + name
+//	if oper == "stop" {
+//		pullRtmprelay, found := s.session[keyString]
+//
+//		if !found {
+//			retString = fmt.Sprintf("session key[%s] not exist, please check it again.", keyString)
+//			res.Status = 400
+//			res.Data = retString
+//			return
+//		}
+//		log.Debugf("rtmprelay stop push %s from %s", remoteurl, localurl)
+//		pullRtmprelay.Stop()
+//
+//		delete(s.session, keyString)
+//		retString = fmt.Sprintf("<h1>push url stop %s ok</h1></br>", url)
+//		res.Status = 400
+//		res.Data = retString
+//		log.Debugf("pull stop return %s", retString)
+//	} else {
+//		pullRtmprelay := rtmprelay.NewRtmpRelay(&localurl, &remoteurl)
+//		log.Debugf("rtmprelay start push %s from %s", remoteurl, localurl)
+//		err = pullRtmprelay.Start()
+//		if err != nil {
+//			retString = fmt.Sprintf("push error=%v", err)
+//		} else {
+//			s.session[keyString] = pullRtmprelay
+//			retString = fmt.Sprintf("<h1>push url start %s ok</h1></br>", url)
+//		}
+//		res.Status = 400
+//		res.Data = retString
+//		log.Debugf("pull start return %s", retString)
+//	}
+//}
 
 //http://127.0.0.1:8090/control/push?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456
-func (s *Server) handlePush(w http.ResponseWriter, req *http.Request) {
-	var retString string
-	var err error
-
-	res := &Response{
-		w:      w,
-		Data:   nil,
-		Status: 200,
-	}
-
-	defer res.SendJson()
-
-	if req.ParseForm() != nil {
-		res.Data = "url: /control/push?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456"
-		return
-	}
-
-	oper := req.Form.Get("oper")
-	app := req.Form.Get("app")
-	name := req.Form.Get("name")
-	url := req.Form.Get("url")
-
-	log.Debugf("control push: oper=%v, app=%v, name=%v, url=%v", oper, app, name, url)
-	if (len(app) <= 0) || (len(name) <= 0) || (len(url) <= 0) {
-		res.Data = "control push parameter error, please check them."
-		return
-	}
-
-	localurl := "rtmp://127.0.0.1" + s.rtmpAddr + "/" + app + "/" + name
-	remoteurl := url
-
-	keyString := "push:" + app + "/" + name
-	if oper == "stop" {
-		pushRtmprelay, found := s.session[keyString]
-		if !found {
-			retString = fmt.Sprintf("<h1>session key[%s] not exist, please check it again.</h1>", keyString)
-			res.Data = retString
-			return
-		}
-		log.Debugf("rtmprelay stop push %s from %s", remoteurl, localurl)
-		pushRtmprelay.Stop()
-
-		delete(s.session, keyString)
-		retString = fmt.Sprintf("<h1>push url stop %s ok</h1></br>", url)
-		res.Data = retString
-		log.Debugf("push stop return %s", retString)
-	} else {
-		pushRtmprelay := rtmprelay.NewRtmpRelay(&localurl, &remoteurl)
-		log.Debugf("rtmprelay start push %s from %s", remoteurl, localurl)
-		err = pushRtmprelay.Start()
-		if err != nil {
-			retString = fmt.Sprintf("push error=%v", err)
-		} else {
-			retString = fmt.Sprintf("<h1>push url start %s ok</h1></br>", url)
-			s.session[keyString] = pushRtmprelay
-		}
-
-		res.Data = retString
-		log.Debugf("push start return %s", retString)
-	}
-}
+//func (s *Server) handlePush(w http.ResponseWriter, req *http.Request) {
+//	var retString string
+//	var err error
+//
+//	res := &Response{
+//		w:      w,
+//		Data:   nil,
+//		Status: 200,
+//	}
+//
+//	defer res.SendJson()
+//
+//	if req.ParseForm() != nil {
+//		res.Data = "url: /control/push?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456"
+//		return
+//	}
+//
+//	oper := req.Form.Get("oper")
+//	app := req.Form.Get("app")
+//	name := req.Form.Get("name")
+//	url := req.Form.Get("url")
+//
+//	log.Debugf("control push: oper=%v, app=%v, name=%v, url=%v", oper, app, name, url)
+//	if (len(app) <= 0) || (len(name) <= 0) || (len(url) <= 0) {
+//		res.Data = "control push parameter error, please check them."
+//		return
+//	}
+//
+//	localurl := "rtmp://127.0.0.1" + s.rtmpAddr + "/" + app + "/" + name
+//	remoteurl := url
+//
+//	keyString := "push:" + app + "/" + name
+//	if oper == "stop" {
+//		pushRtmprelay, found := s.session[keyString]
+//		if !found {
+//			retString = fmt.Sprintf("<h1>session key[%s] not exist, please check it again.</h1>", keyString)
+//			res.Data = retString
+//			return
+//		}
+//		log.Debugf("rtmprelay stop push %s from %s", remoteurl, localurl)
+//		pushRtmprelay.Stop()
+//
+//		delete(s.session, keyString)
+//		retString = fmt.Sprintf("<h1>push url stop %s ok</h1></br>", url)
+//		res.Data = retString
+//		log.Debugf("push stop return %s", retString)
+//	} else {
+//		pushRtmprelay := rtmprelay.NewRtmpRelay(&localurl, &remoteurl)
+//		log.Debugf("rtmprelay start push %s from %s", remoteurl, localurl)
+//		err = pushRtmprelay.Start()
+//		if err != nil {
+//			retString = fmt.Sprintf("push error=%v", err)
+//		} else {
+//			retString = fmt.Sprintf("<h1>push url start %s ok</h1></br>", url)
+//			s.session[keyString] = pushRtmprelay
+//		}
+//
+//		res.Data = retString
+//		log.Debugf("push start return %s", retString)
+//	}
+//}
 
 //http://127.0.0.1:8090/control/reset?room=ROOM_NAME
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {

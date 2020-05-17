@@ -140,6 +140,7 @@ func (conn *Conn) HandshakeClient() (err error) {
 	return
 }
 
+//handshake, 服务端
 func (conn *Conn) HandshakeServer() (err error) {
 	var random [(1 + 1536*2) * 2]byte
 
