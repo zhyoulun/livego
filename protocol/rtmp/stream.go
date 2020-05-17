@@ -33,7 +33,7 @@ func (rs *RtmpStream) HandleReader(r av.ReadCloser) {
 	var stream *Stream
 	i, ok := rs.streams.Get(info.Key)
 	if stream, ok = i.(*Stream); ok {
-		stream.TransStop()
+		stream.TransStop()//如果已经有在推流，则停掉在推流
 		id := stream.ID()
 		if id != EmptyID && id != info.UID {
 			ns := NewStream()
