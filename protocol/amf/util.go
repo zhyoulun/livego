@@ -6,13 +6,13 @@ import (
 	"io"
 )
 
-func DumpBytes(label string, buf []byte, size int) {
-	fmt.Printf("Dumping %s (%d bytes):\n", label, size)
-	for i := 0; i < size; i++ {
-		fmt.Printf("0x%02x ", buf[i])
-	}
-	fmt.Printf("\n")
-}
+//func DumpBytes(label string, buf []byte, size int) {
+//	fmt.Printf("Dumping %s (%d bytes):\n", label, size)
+//	for i := 0; i < size; i++ {
+//		fmt.Printf("0x%02x ", buf[i])
+//	}
+//	fmt.Printf("\n")
+//}
 
 func Dump(label string, val interface{}) error {
 	json, err := json.MarshalIndent(val, "", "  ")
