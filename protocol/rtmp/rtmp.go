@@ -2,13 +2,12 @@ package rtmp
 
 import (
 	"fmt"
+	"github.com/zhyoulun/livego/utils"
 	"net"
 	"net/url"
 	"reflect"
 	"strings"
 	"time"
-
-	"github.com/zhyoulun/livego/utils/uid"
 
 	"github.com/zhyoulun/livego/av"
 	"github.com/zhyoulun/livego/configure"
@@ -106,18 +105,6 @@ func (s *Server) handleConn(conn *core.Conn) error {
 		reader := NewVirReader(connServer)
 		s.handler.HandleReader(reader)
 		log.Debugf("new publisher: %+v", reader.Info())
-
-		//hls
-		//if s.getter != nil {
-		//	writeType := reflect.TypeOf(s.getter)
-		//	log.Debugf("handleConn:writeType=%v", writeType)
-		//	writer := s.getter.GetWriter(reader.Info())
-		//	s.handler.HandleWriter(writer)
-		//}
-
-		//dvr
-		//flvWriter := new(flv.FlvDvr)
-		//s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
 	} else {
 		writer := NewVirWriter(connServer)
 		log.Debugf("new player: %+v", writer.Info())
@@ -152,8 +139,8 @@ type StaticsBW struct {
 }
 
 type VirWriter struct {
-	Uid    string
-	closed bool
+	sessionID string
+	closed    bool
 	av.RWBaser
 	conn        StreamReadWriteCloser
 	packetQueue chan *av.Packet
@@ -162,7 +149,7 @@ type VirWriter struct {
 
 func NewVirWriter(conn StreamReadWriteCloser) *VirWriter {
 	ret := &VirWriter{
-		Uid:         uid.NewId(),
+		sessionID:   utils.GenSessionIDString(),
 		conn:        conn,
 		RWBaser:     av.NewRWBaser(time.Second * time.Duration(writeTimeout)),
 		packetQueue: make(chan *av.Packet, maxQueueNum),
@@ -306,7 +293,6 @@ func (v *VirWriter) SendPacket() error {
 }
 
 func (v *VirWriter) Info() (ret av.Info) {
-	ret.UID = v.Uid
 	_, _, URL := v.conn.GetInfo()
 	ret.URL = URL
 	_url, err := url.Parse(URL)
@@ -315,6 +301,7 @@ func (v *VirWriter) Info() (ret av.Info) {
 	}
 	ret.Key = strings.TrimLeft(_url.Path, "/")
 	ret.Inter = true
+	ret.SessionID = v.sessionID
 	return
 }
 
@@ -328,7 +315,7 @@ func (v *VirWriter) Close(err error) {
 }
 
 type VirReader struct {
-	Uid string
+	sessionID string
 	av.RWBaser
 	demuxer    *flv.Demuxer
 	conn       StreamReadWriteCloser
@@ -338,7 +325,7 @@ type VirReader struct {
 func NewVirReader(conn StreamReadWriteCloser) *VirReader {
 	log.Debugf("writeTimeout: %d", writeTimeout)
 	return &VirReader{
-		Uid:        uid.NewId(),
+		sessionID:  utils.GenSessionIDString(),
 		conn:       conn,
 		RWBaser:    av.NewRWBaser(time.Second * time.Duration(writeTimeout)),
 		demuxer:    flv.NewDemuxer(),
@@ -412,7 +399,6 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 }
 
 func (v *VirReader) Info() (ret av.Info) {
-	ret.UID = v.Uid
 	_, _, URL := v.conn.GetInfo()
 	ret.URL = URL
 	_url, err := url.Parse(URL)
@@ -420,6 +406,7 @@ func (v *VirReader) Info() (ret av.Info) {
 		log.Warning(err)
 	}
 	ret.Key = strings.TrimLeft(_url.Path, "/")
+	ret.SessionID = v.sessionID
 	return
 }
 
