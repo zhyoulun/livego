@@ -5,25 +5,20 @@ import (
 	"net"
 	"net/http"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
-	"github.com/dgrijalva/jwt-go"
-	log "github.com/sirupsen/logrus"
 	"github.com/zhyoulun/livego/av"
-	"github.com/zhyoulun/livego/configure"
 	"github.com/zhyoulun/livego/protocol/rtmp"
 )
 
 type Response struct {
 	w      http.ResponseWriter
-	Status int         `json:"status"`
-	Data   interface{} `json:"data"`
+	Status int    `json:"status"`
+	Data   []byte `json:"data"`
 }
 
 func (r *Response) SendJson() (int, error) {
-	resp, _ := json.Marshal(r)
 	r.w.Header().Set("Content-Type", "application/json")
 	r.w.WriteHeader(r.Status)
-	return r.w.Write(resp)
+	return r.w.Write(r.Data)
 }
 
 type Operation struct {
@@ -59,59 +54,19 @@ func NewServer(h av.Handler, rtmpAddr string) *Server {
 	}
 }
 
-func JWTMiddleware(next http.Handler) http.Handler {
-	isJWT := len(configure.Config.GetString("jwt.secret")) > 0
-	if !isJWT {
-		return next
-	}
-
-	log.Info("Using JWT middleware")
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var algorithm jwt.SigningMethod
-		if len(configure.Config.GetString("jwt.algorithm")) > 0 {
-			algorithm = jwt.GetSigningMethod(configure.Config.GetString("jwt.algorithm"))
-		}
-
-		if algorithm == nil {
-			algorithm = jwt.SigningMethodHS256
-		}
-
-		jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
-			Extractor: jwtmiddleware.FromFirst(jwtmiddleware.FromAuthHeader, jwtmiddleware.FromParameter("jwt")),
-			ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
-				return []byte(configure.Config.GetString("jwt.secret")), nil
-			},
-			SigningMethod: algorithm,
-			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
-				res := &Response{
-					w:      w,
-					Status: 403,
-					Data:   err,
-				}
-				res.SendJson()
-			},
-		})
-
-		jwtMiddleware.HandlerWithNext(w, r, next.ServeHTTP)
-	})
-}
-
 func (s *Server) Serve(l net.Listener) error {
 	mux := http.NewServeMux()
-
-	mux.Handle("/statics/", http.StripPrefix("/statics/", http.FileServer(http.Dir("statics"))))
-
 	mux.HandleFunc("/stat/livestat", func(w http.ResponseWriter, r *http.Request) {
 		s.GetLiveStatics(w, r)
 	})
-	http.Serve(l, JWTMiddleware(mux))
+	http.Serve(l, mux)
 	return nil
 }
 
 type stream struct {
 	Key             string `json:"key"`
 	Url             string `json:"url"`
+	SessionID       string `json:"session_id"`
 	StreamId        uint32 `json:"stream_id"`
 	VideoTotalBytes uint64 `json:"video_total_bytes"`
 	VideoSpeed      uint64 `json:"video_speed"`
@@ -137,7 +92,7 @@ func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 	rtmpStream := server.handler.(*rtmp.RtmpStream)
 	if rtmpStream == nil {
 		res.Status = 500
-		res.Data = "Get rtmp stream information error"
+		//res.Data = "Get rtmp stream information error"
 		return
 	}
 
@@ -148,7 +103,7 @@ func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 				switch s.GetReader().(type) {
 				case *rtmp.VirReader:
 					v := s.GetReader().(*rtmp.VirReader)
-					msg := stream{item.Key, v.Info().URL, v.ReadBWInfo.StreamId, v.ReadBWInfo.VideoDatainBytes, v.ReadBWInfo.VideoSpeedInBytesperMS,
+					msg := stream{item.Key, v.Info().URL, v.Info().SessionID, v.ReadBWInfo.StreamId, v.ReadBWInfo.VideoDatainBytes, v.ReadBWInfo.VideoSpeedInBytesperMS,
 						v.ReadBWInfo.AudioDatainBytes, v.ReadBWInfo.AudioSpeedInBytesperMS}
 					msgs.Publishers = append(msgs.Publishers, msg)
 				}
@@ -164,7 +119,7 @@ func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 					switch pw.GetWriter().(type) {
 					case *rtmp.VirWriter:
 						v := pw.GetWriter().(*rtmp.VirWriter)
-						msg := stream{item.Key, v.Info().URL, v.WriteBWInfo.StreamId, v.WriteBWInfo.VideoDatainBytes, v.WriteBWInfo.VideoSpeedInBytesperMS,
+						msg := stream{item.Key, v.Info().URL, v.Info().SessionID, v.WriteBWInfo.StreamId, v.WriteBWInfo.VideoDatainBytes, v.WriteBWInfo.VideoSpeedInBytesperMS,
 							v.WriteBWInfo.AudioDatainBytes, v.WriteBWInfo.AudioSpeedInBytesperMS}
 						msgs.Players = append(msgs.Players, msg)
 					}

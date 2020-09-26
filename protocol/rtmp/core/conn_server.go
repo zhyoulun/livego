@@ -12,12 +12,6 @@ import (
 )
 
 var (
-	publishLive   = "live"
-	publishRecord = "record"
-	publishAppend = "append"
-)
-
-var (
 	ErrReq = fmt.Errorf("req error")
 )
 
@@ -346,9 +340,7 @@ func (connServer *ConnServer) Read(c *ChunkStream) (err error) {
 	return connServer.conn.Read(c)
 }
 
-func (connServer *ConnServer) GetInfo() (app string, name string, url string) {
-	app = connServer.ConnInfo.App
-	name = connServer.PublishInfo.Name
+func (connServer *ConnServer) GetURL() (url string) {
 	url = connServer.ConnInfo.TcUrl + "/" + connServer.PublishInfo.Name
 	return
 }

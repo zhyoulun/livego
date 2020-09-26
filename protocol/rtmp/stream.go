@@ -10,10 +10,6 @@ import (
 	"github.com/zhyoulun/livego/protocol/rtmp/cache"
 )
 
-var (
-	EmptyID = ""
-)
-
 type RtmpStream struct {
 	streams cmap.ConcurrentMap //key
 }
@@ -34,14 +30,12 @@ func (rs *RtmpStream) HandleReader(r av.ReadCloser) {
 	i, ok := rs.streams.Get(info.Key)
 	if stream, ok = i.(*Stream); ok {
 		stream.TransStop() //如果已经有在推流，则停掉在推流
-		//id := stream.ID()
-		//if id != EmptyID && id != info.UID {
+
 		ns := NewStream()
 		stream.Copy(ns)
 		stream = ns
 		rs.streams.Set(info.Key, ns)
 		log.Debugf("rtmpStream.streams add reader: %+v", info.Key)
-		//}
 	} else {
 		stream = NewStream()
 		rs.streams.Set(info.Key, stream)
@@ -146,8 +140,6 @@ func (s *Stream) TransStart() {
 
 	log.Debugf("TransStart: %v", s.info)
 
-	//s.StartStaticPush()
-
 	for {
 		if !s.isStart {
 			s.closeInter()
@@ -159,10 +151,6 @@ func (s *Stream) TransStart() {
 			s.isStart = false
 			return
 		}
-
-		//if s.IsSendStaticPush() {
-		//	s.SendStaticPush(p)
-		//}
 
 		//publish先写到cache中
 		s.cache.Write(p)

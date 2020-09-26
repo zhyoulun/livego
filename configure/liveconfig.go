@@ -133,29 +133,3 @@ func Init() {
 	Config.Unmarshal(&c)
 	log.Debugf("Current configurations: \n%# v", pretty.Formatter(c))
 }
-
-func CheckAppName(appname string) bool {
-	apps := Applications{}
-	Config.UnmarshalKey("server", &apps)
-	for _, app := range apps {
-		if app.Appname == appname {
-			return app.Live
-		}
-	}
-	return false
-}
-
-func GetStaticPushUrlList(appname string) ([]string, bool) {
-	apps := Applications{}
-	Config.UnmarshalKey("server", &apps)
-	for _, app := range apps {
-		if (app.Appname == appname) && app.Live {
-			if len(app.StaticPush) > 0 {
-				return app.StaticPush, true
-			} else {
-				return nil, false
-			}
-		}
-	}
-	return nil, false
-}

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/zhyoulun/livego/av"
-	"github.com/zhyoulun/livego/configure"
 	"github.com/zhyoulun/livego/container/flv"
 	"github.com/zhyoulun/livego/protocol/rtmp/core"
 
@@ -80,28 +79,8 @@ func (s *Server) handleConn(conn *core.Conn) error {
 		return err
 	}
 
-	appname, _, _ := connServer.GetInfo()
-
-	if ret := configure.CheckAppName(appname); !ret {
-		err := fmt.Errorf("application name=%s is not configured", appname)
-		conn.Close()
-		log.Error("CheckAppName err: ", err)
-		return err
-	}
-
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
 	if connServer.IsPublisher() {
-		//channel, err := configure.RoomKeys.GetChannel(name)
-		//if err != nil {
-		//	err := fmt.Errorf("invalid key")
-		//	conn.Close()
-		//	log.Error("CheckKey err: ", err)
-		//	return err
-		//}
-		//connServer.PublishInfo.Name = name
-		if pushlist, ret := configure.GetStaticPushUrlList(appname); ret && (pushlist != nil) {
-			log.Debugf("GetStaticPushUrlList: %v", pushlist)
-		}
 		reader := NewVirReader(connServer)
 		s.handler.HandleReader(reader)
 		log.Debugf("new publisher: %+v", reader.Info())
@@ -115,7 +94,7 @@ func (s *Server) handleConn(conn *core.Conn) error {
 }
 
 type GetInFo interface {
-	GetInfo() (string, string, string)
+	GetURL() string
 }
 
 type StreamReadWriteCloser interface {
@@ -293,7 +272,7 @@ func (v *VirWriter) SendPacket() error {
 }
 
 func (v *VirWriter) Info() (ret av.Info) {
-	_, _, URL := v.conn.GetInfo()
+	URL := v.conn.GetURL()
 	ret.URL = URL
 	_url, err := url.Parse(URL)
 	if err != nil {
@@ -399,7 +378,7 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 }
 
 func (v *VirReader) Info() (ret av.Info) {
-	_, _, URL := v.conn.GetInfo()
+	URL := v.conn.GetURL()
 	ret.URL = URL
 	_url, err := url.Parse(URL)
 	if err != nil {
