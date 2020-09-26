@@ -33,17 +33,19 @@ func (rs *RtmpStream) HandleReader(r av.ReadCloser) {
 	var stream *Stream
 	i, ok := rs.streams.Get(info.Key)
 	if stream, ok = i.(*Stream); ok {
-		stream.TransStop()//如果已经有在推流，则停掉在推流
+		stream.TransStop() //如果已经有在推流，则停掉在推流
 		id := stream.ID()
 		if id != EmptyID && id != info.UID {
 			ns := NewStream()
 			stream.Copy(ns)
 			stream = ns
 			rs.streams.Set(info.Key, ns)
+			log.Debugf("rtmpStream.streams add reader: %+v", info.Key)
 		}
 	} else {
 		stream = NewStream()
 		rs.streams.Set(info.Key, stream)
+		log.Debugf("rtmpStream.streams add reader: %+v", info.Key)
 		stream.info = info
 	}
 
@@ -59,6 +61,7 @@ func (rs *RtmpStream) HandleWriter(w av.WriteCloser) {
 	if !ok {
 		s = NewStream()
 		rs.streams.Set(info.Key, s)
+		log.Debugf("rtmpStream.streams add writer: %+v", info.Key)
 		s.info = info
 	} else {
 		item, ok := rs.streams.Get(info.Key)

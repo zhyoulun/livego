@@ -15,26 +15,6 @@ import (
 
 var VERSION = "master"
 
-//func startHls() *hls.Server {
-//	hlsAddr := configure.Config.GetString("hls_addr")
-//	hlsListen, err := net.Listen("tcp", hlsAddr)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	hlsServer := hls.NewServer()
-//	go func() {
-//		defer func() {
-//			if r := recover(); r != nil {
-//				log.Error("HLS server panic: ", r)
-//			}
-//		}()
-//		log.Info("HLS listen On ", hlsAddr)
-//		hlsServer.Serve(hlsListen)
-//	}()
-//	return hlsServer
-//}
-
 var rtmpAddr string
 
 func startRtmp(stream *rtmp.RtmpStream) {
@@ -58,26 +38,6 @@ func startRtmp(stream *rtmp.RtmpStream) {
 	rtmpServer.Serve(rtmpListen)
 }
 
-//func startHTTPFlv(stream *rtmp.RtmpStream) {
-//	httpflvAddr := configure.Config.GetString("httpflv_addr")
-//
-//	flvListen, err := net.Listen("tcp", httpflvAddr)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//
-//	hdlServer := httpflv.NewServer(stream)
-//	go func() {
-//		defer func() {
-//			if r := recover(); r != nil {
-//				log.Error("HTTP-FLV server panic: ", r)
-//			}
-//		}()
-//		log.Info("HTTP-FLV listen On ", httpflvAddr)
-//		hdlServer.Serve(flvListen)
-//	}()
-//}
-
 func startAPI(stream *rtmp.RtmpStream) {
 	apiAddr := configure.Config.GetString("api_addr")
 
@@ -99,7 +59,7 @@ func startAPI(stream *rtmp.RtmpStream) {
 	}
 }
 
-func init() {
+func Init() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp: true,
 		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
@@ -107,10 +67,13 @@ func init() {
 			return fmt.Sprintf("%s()", f.Function), fmt.Sprintf(" %s:%d", filename, f.Line)
 		},
 	})
-	log.SetLevel(log.DebugLevel)//打开debug日志开关
+	log.SetLevel(log.DebugLevel) //打开debug日志开关
 }
 
 func main() {
+	Init()
+	configure.Init()
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("livego panic: ", r)
@@ -128,8 +91,6 @@ func main() {
 	`, VERSION)
 
 	stream := rtmp.NewRtmpStream()
-	//hlsServer := startHls()
-	//startHTTPFlv(stream)
 	startAPI(stream)
 
 	startRtmp(stream)

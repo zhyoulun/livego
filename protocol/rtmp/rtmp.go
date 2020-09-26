@@ -25,7 +25,8 @@ const (
 
 var (
 	//readTimeout  = configure.Config.GetInt("read_timeout")
-	writeTimeout = configure.Config.GetInt("write_timeout")
+	//writeTimeout = configure.Config.GetInt("write_timeout")
+	writeTimeout = 1 //读写数据的超时时间，这里设置为1s
 )
 
 type Client struct {
@@ -80,7 +81,7 @@ func (s *Server) handleConn(conn *core.Conn) error {
 		return err
 	}
 
-	appname, name, _ := connServer.GetInfo()
+	appname, _, _ := connServer.GetInfo()
 
 	if ret := configure.CheckAppName(appname); !ret {
 		err := fmt.Errorf("application name=%s is not configured", appname)
@@ -91,14 +92,14 @@ func (s *Server) handleConn(conn *core.Conn) error {
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
 	if connServer.IsPublisher() {
-		channel, err := configure.RoomKeys.GetChannel(name)
-		if err != nil {
-			err := fmt.Errorf("invalid key")
-			conn.Close()
-			log.Error("CheckKey err: ", err)
-			return err
-		}
-		connServer.PublishInfo.Name = channel
+		//channel, err := configure.RoomKeys.GetChannel(name)
+		//if err != nil {
+		//	err := fmt.Errorf("invalid key")
+		//	conn.Close()
+		//	log.Error("CheckKey err: ", err)
+		//	return err
+		//}
+		//connServer.PublishInfo.Name = name
 		if pushlist, ret := configure.GetStaticPushUrlList(appname); ret && (pushlist != nil) {
 			log.Debugf("GetStaticPushUrlList: %v", pushlist)
 		}
@@ -288,7 +289,7 @@ func (v *VirWriter) SendPacket() error {
 			}
 
 			v.SaveStatics(p.StreamID, uint64(cs.Length), p.IsVideo)
-			v.SetPreTime()
+			v.SetPreTime("write")
 			v.RecTimeStamp(cs.Timestamp, cs.TypeID)
 			err := v.conn.Write(cs)
 			if err != nil {
@@ -335,6 +336,7 @@ type VirReader struct {
 }
 
 func NewVirReader(conn StreamReadWriteCloser) *VirReader {
+	log.Debugf("writeTimeout: %d", writeTimeout)
 	return &VirReader{
 		Uid:        uid.NewId(),
 		conn:       conn,
@@ -376,7 +378,7 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 		}
 	}()
 
-	v.SetPreTime()
+	v.SetPreTime("read")
 
 	//get chunk stream
 	var cs core.ChunkStream
