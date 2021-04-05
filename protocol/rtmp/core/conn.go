@@ -69,7 +69,7 @@ func (conn *Conn) Read(c *chunkstream.ChunkStream) error {
 }
 
 func (conn *Conn) Write(cs *chunkstream.ChunkStream) error {
-	if cs.TypeID == c.IDSetChunkSize {
+	if cs.TypeID == c.MessageTypeIDSetChunkSize {
 		conn.chunkSize = binary.BigEndian.Uint32(cs.Data)
 	}
 	return cs.WriteChunk(conn.rw, int(conn.chunkSize))
@@ -96,9 +96,9 @@ func (conn *Conn) SetDeadline(t time.Time) error {
 }
 
 func (conn *Conn) handleProtocolControlMessage(cs *chunkstream.ChunkStream) {
-	if cs.TypeID == c.IDSetChunkSize {
+	if cs.TypeID == c.MessageTypeIDSetChunkSize {
 		conn.remoteChunkSize = binary.BigEndian.Uint32(cs.Data)
-	} else if cs.TypeID == c.IDWindowAckSize {
+	} else if cs.TypeID == c.MessageTypeIDWindowAckSize {
 		conn.remoteWindowAckSize = binary.BigEndian.Uint32(cs.Data)
 	}
 }

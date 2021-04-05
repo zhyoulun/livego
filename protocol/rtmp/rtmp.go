@@ -73,7 +73,7 @@ func (s *Server) handleConn(conn *core.Conn) {
 	}
 	connServer := core.NewConnServer(conn)
 
-	if err := connServer.ReadMsg(); err != nil {
+	if err := connServer.ReadMessage(); err != nil {
 		log.Error("handleConn read msg err: ", err)
 		if err = conn.Close(); err != nil {
 			log.Error("conn Close err: ", err)
@@ -255,7 +255,7 @@ func (v *VirWriter) SendPacket() error {
 			}
 
 			v.SaveStatics(p.StreamID, uint64(cs.Length), p.IsVideo)
-			v.SetPreTime("write")
+			v.SetPreTime()
 			v.RecTimeStamp(cs.Timestamp, cs.TypeID)
 			err := v.conn.Write(cs)
 			if err != nil {
@@ -344,7 +344,7 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 		}
 	}()
 
-	v.SetPreTime("read")
+	v.SetPreTime()
 
 	//get chunk stream
 	var cs chunkstream.ChunkStream

@@ -8,22 +8,22 @@ import (
 
 //protocol control message
 func NewAck(size uint32) chunkstream.ChunkStream {
-	return newProtocolControlMessage(c.IDAck, 4, size)
+	return newProtocolControlMessage(c.MessageTypeIDAck, 4, size)
 }
 
 //protocol control message
 func NewSetChunkSize(size uint32) chunkstream.ChunkStream {
-	return newProtocolControlMessage(c.IDSetChunkSize, 4, size)
+	return newProtocolControlMessage(c.MessageTypeIDSetChunkSize, 4, size)
 }
 
 //protocol control message
 func NewWindowAckSize(size uint32) chunkstream.ChunkStream {
-	return newProtocolControlMessage(c.IDWindowAckSize, 4, size)
+	return newProtocolControlMessage(c.MessageTypeIDWindowAckSize, 4, size)
 }
 
 //protocol control message
 func NewSetPeerBandwidth(size uint32) chunkstream.ChunkStream {
-	ret := newProtocolControlMessage(c.IDSetPeerBandwidth, 5, size)
+	ret := newProtocolControlMessage(c.MessageTypeIDSetPeerBandwidth, 5, size)
 	ret.Data[4] = 2
 	return ret
 }

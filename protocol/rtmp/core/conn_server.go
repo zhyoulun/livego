@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"github.com/zhyoulun/livego/protocol/rtmp/c"
 	"github.com/zhyoulun/livego/protocol/rtmp/chunkstream"
 	"github.com/zhyoulun/livego/protocol/rtmp/message"
 	"io"
@@ -89,16 +90,16 @@ func (connServer *ConnServer) writeMsg(csID, streamID uint32, args ...interface{
 		}
 	}
 	msg := connServer.bytesw.Bytes()
-	c := chunkstream.ChunkStream{
+	cs := chunkstream.ChunkStream{
 		Format:    0,
 		CSID:      csID,
 		Timestamp: 0,
-		TypeID:    20,
+		TypeID:    c.MessageTypeCommandMessageAMF0,
 		StreamID:  streamID,
 		Length:    uint32(len(msg)),
 		Data:      msg,
 	}
-	connServer.conn.Write(&c)
+	connServer.conn.Write(&cs)
 	return connServer.conn.Flush()
 }
 
@@ -237,12 +238,12 @@ func (connServer *ConnServer) playResp(cur *chunkstream.ChunkStream) error {
 	return connServer.conn.Flush()
 }
 
-func (connServer *ConnServer) handleCmdMsg(c *chunkstream.ChunkStream) error {
+func (connServer *ConnServer) handleCommandMessage(cs *chunkstream.ChunkStream) error {
 	amfType := amf.AMF0
-	if c.TypeID == 17 {
-		c.Data = c.Data[1:]
+	if cs.TypeID == c.MessageTypeCommandMessageAMF3 {
+		cs.Data = cs.Data[1:]
 	}
-	r := bytes.NewReader(c.Data)
+	r := bytes.NewReader(cs.Data)
 	vs, err := connServer.decoder.DecodeBatch(r, amf.Version(amfType))
 	if err != nil && err != io.EOF {
 		return err
@@ -255,21 +256,21 @@ func (connServer *ConnServer) handleCmdMsg(c *chunkstream.ChunkStream) error {
 			if err = connServer.connect(vs[1:]); err != nil {
 				return err
 			}
-			if err = connServer.connectResp(c); err != nil {
+			if err = connServer.connectResp(cs); err != nil {
 				return err
 			}
 		case cmdCreateStream:
 			if err = connServer.createStream(vs[1:]); err != nil {
 				return err
 			}
-			if err = connServer.createStreamResp(c); err != nil {
+			if err = connServer.createStreamResp(cs); err != nil {
 				return err
 			}
 		case cmdPublish:
 			if err = connServer.publishOrPlay(vs[1:]); err != nil {
 				return err
 			}
-			if err = connServer.publishResp(c); err != nil {
+			if err = connServer.publishResp(cs); err != nil {
 				return err
 			}
 			connServer.done = true
@@ -279,7 +280,7 @@ func (connServer *ConnServer) handleCmdMsg(c *chunkstream.ChunkStream) error {
 			if err = connServer.publishOrPlay(vs[1:]); err != nil {
 				return err
 			}
-			if err = connServer.playResp(c); err != nil {
+			if err = connServer.playResp(cs); err != nil {
 				return err
 			}
 			connServer.done = true
@@ -299,15 +300,15 @@ func (connServer *ConnServer) handleCmdMsg(c *chunkstream.ChunkStream) error {
 	return nil
 }
 
-func (connServer *ConnServer) ReadMsg() error {
-	var c chunkstream.ChunkStream
+func (connServer *ConnServer) ReadMessage() error {
+	var cs chunkstream.ChunkStream
 	for {
-		if err := connServer.conn.Read(&c); err != nil {
+		if err := connServer.conn.Read(&cs); err != nil {
 			return err
 		}
-		switch c.TypeID {
-		case 20, 17:
-			if err := connServer.handleCmdMsg(&c); err != nil {
+		switch cs.TypeID {
+		case c.MessageTypeCommandMessageAMF3, c.MessageTypeCommandMessageAMF0:
+			if err := connServer.handleCommandMessage(&cs); err != nil {
 				return err
 			}
 		}

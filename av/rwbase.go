@@ -41,10 +41,9 @@ func (rw *RWBaser) RecTimeStamp(timestamp, typeID uint32) {
 	}
 }
 
-func (rw *RWBaser) SetPreTime(rwType string) {
+func (rw *RWBaser) SetPreTime() {
 	rw.lock.Lock()
 	rw.PreTime = time.Now()
-	//log.Debugf("update rw.PreTime %s", rwType)
 	rw.lock.Unlock()
 }
 

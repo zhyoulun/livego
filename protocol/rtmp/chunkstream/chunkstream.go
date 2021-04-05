@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/zhyoulun/livego/av"
+	"github.com/zhyoulun/livego/protocol/rtmp/c"
 	"github.com/zhyoulun/livego/utils/mio"
 	"github.com/zhyoulun/livego/utils/pool"
 )
@@ -19,7 +20,7 @@ type ChunkStream struct {
 	timeDelta uint32
 	exted     bool
 	index     uint32
-	remain    uint32
+	remain    uint32 //use when read
 	got       bool
 	Data      []byte
 }
@@ -121,10 +122,12 @@ func (cs *ChunkStream) WriteChunk(w *mio.ReadWriter, chunkSize int) error {
 }
 
 func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool.Pool) error {
-	if cs.remain != 0 && cs.TmpFormat != 3 {
+	if cs.remain != 0 && cs.TmpFormat != 3 { //?看不懂
 		return fmt.Errorf("inlaid remain = %d", cs.remain)
 	}
-	switch cs.CSID {
+
+	//计算cs.CSID
+	switch cs.CSID { //如果csID=0,1，需要加上64，作为真正的csID；2保留不用；3不用加
 	case 0:
 		id, _ := r.ReadUintLE(1)
 		cs.CSID = id + 64
@@ -133,9 +136,13 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		cs.CSID = id + 64
 	}
 
+	//计算chunk message header 以及 extended timestamp
 	switch cs.TmpFormat {
-	case 0:
+	case c.FMT0:
+		//format
 		cs.Format = cs.TmpFormat
+
+		//timestamp, message length, message type id, message stream id
 		cs.Timestamp, _ = r.ReadUintBE(3)
 		cs.Length, _ = r.ReadUintBE(3)
 		cs.TypeID, _ = r.ReadUintBE(1)
@@ -146,9 +153,14 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		} else {
 			cs.exted = false
 		}
+
 		cs.new(pool)
-	case 1:
+	case c.FMT1:
+		//format
 		cs.Format = cs.TmpFormat
+
+		//timestamp delta, message length, message type id
+		//timestamp
 		timeStamp, _ := r.ReadUintBE(3)
 		cs.Length, _ = r.ReadUintBE(3)
 		cs.TypeID, _ = r.ReadUintBE(1)
@@ -160,9 +172,14 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		}
 		cs.timeDelta = timeStamp
 		cs.Timestamp += timeStamp
+
 		cs.new(pool)
-	case 2:
+	case c.FMT2:
+		//format
 		cs.Format = cs.TmpFormat
+
+		//timestamp delta
+		//timestamp
 		timeStamp, _ := r.ReadUintBE(3)
 		if timeStamp == 0xffffff {
 			timeStamp, _ = r.ReadUintBE(4)
@@ -172,16 +189,17 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		}
 		cs.timeDelta = timeStamp
 		cs.Timestamp += timeStamp
+
 		cs.new(pool)
-	case 3:
+	case c.FMT3:
 		if cs.remain == 0 {
 			switch cs.Format {
-			case 0:
+			case c.FMT0:
 				if cs.exted {
 					timestamp, _ := r.ReadUintBE(4)
 					cs.Timestamp = timestamp
 				}
-			case 1, 2:
+			case c.FMT1, c.FMT2:
 				var timedet uint32
 				if cs.exted {
 					timedet, _ = r.ReadUintBE(4)
