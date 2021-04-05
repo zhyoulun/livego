@@ -3,6 +3,8 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"github.com/zhyoulun/livego/protocol/rtmp/chunkstream"
+	"github.com/zhyoulun/livego/protocol/rtmp/message"
 	"io"
 
 	"github.com/zhyoulun/livego/av"
@@ -79,7 +81,7 @@ func NewConnServer(conn *Conn) *ConnServer {
 	}
 }
 
-func (connServer *ConnServer) writeMsg(csid, streamID uint32, args ...interface{}) error {
+func (connServer *ConnServer) writeMsg(csID, streamID uint32, args ...interface{}) error {
 	connServer.bytesw.Reset()
 	for _, v := range args {
 		if _, err := connServer.encoder.Encode(connServer.bytesw, v, amf.AMF0); err != nil {
@@ -87,9 +89,9 @@ func (connServer *ConnServer) writeMsg(csid, streamID uint32, args ...interface{
 		}
 	}
 	msg := connServer.bytesw.Bytes()
-	c := ChunkStream{
+	c := chunkstream.ChunkStream{
 		Format:    0,
-		CSID:      csid,
+		CSID:      csID,
 		Timestamp: 0,
 		TypeID:    20,
 		StreamID:  streamID,
@@ -137,12 +139,12 @@ func (connServer *ConnServer) fcPublish(vs []interface{}) error {
 	return nil
 }
 
-func (connServer *ConnServer) connectResp(cur *ChunkStream) error {
-	c := connServer.conn.NewWindowAckSize(2500000)
+func (connServer *ConnServer) connectResp(cur *chunkstream.ChunkStream) error {
+	c := message.NewWindowAckSize(2500000)
 	connServer.conn.Write(&c)
-	c = connServer.conn.NewSetPeerBandwidth(2500000)
+	c = message.NewSetPeerBandwidth(2500000)
 	connServer.conn.Write(&c)
-	c = connServer.conn.NewSetChunkSize(uint32(1024))
+	c = message.NewSetChunkSize(uint32(1024))
 	connServer.conn.Write(&c)
 
 	resp := make(amf.Object)
@@ -169,7 +171,7 @@ func (connServer *ConnServer) createStream(vs []interface{}) error {
 	return nil
 }
 
-func (connServer *ConnServer) createStreamResp(cur *ChunkStream) error {
+func (connServer *ConnServer) createStreamResp(cur *chunkstream.ChunkStream) error {
 	return connServer.writeMsg(cur.CSID, cur.StreamID, "_result", connServer.transactionID, nil, connServer.streamID)
 }
 
@@ -192,7 +194,7 @@ func (connServer *ConnServer) publishOrPlay(vs []interface{}) error {
 	return nil
 }
 
-func (connServer *ConnServer) publishResp(cur *ChunkStream) error {
+func (connServer *ConnServer) publishResp(cur *chunkstream.ChunkStream) error {
 	event := make(amf.Object)
 	event["level"] = "status"
 	event["code"] = "NetStream.Publish.Start"
@@ -200,7 +202,7 @@ func (connServer *ConnServer) publishResp(cur *ChunkStream) error {
 	return connServer.writeMsg(cur.CSID, cur.StreamID, "onStatus", 0, nil, event)
 }
 
-func (connServer *ConnServer) playResp(cur *ChunkStream) error {
+func (connServer *ConnServer) playResp(cur *chunkstream.ChunkStream) error {
 	connServer.conn.SetRecorded()
 	connServer.conn.SetBegin()
 
@@ -235,7 +237,7 @@ func (connServer *ConnServer) playResp(cur *ChunkStream) error {
 	return connServer.conn.Flush()
 }
 
-func (connServer *ConnServer) handleCmdMsg(c *ChunkStream) error {
+func (connServer *ConnServer) handleCmdMsg(c *chunkstream.ChunkStream) error {
 	amfType := amf.AMF0
 	if c.TypeID == 17 {
 		c.Data = c.Data[1:]
@@ -298,7 +300,7 @@ func (connServer *ConnServer) handleCmdMsg(c *ChunkStream) error {
 }
 
 func (connServer *ConnServer) ReadMsg() error {
-	var c ChunkStream
+	var c chunkstream.ChunkStream
 	for {
 		if err := connServer.conn.Read(&c); err != nil {
 			return err
@@ -320,7 +322,7 @@ func (connServer *ConnServer) IsPublisher() bool {
 	return connServer.isPublisher
 }
 
-func (connServer *ConnServer) Write(c ChunkStream) error {
+func (connServer *ConnServer) Write(c chunkstream.ChunkStream) error {
 	if c.TypeID == av.TAG_SCRIPTDATAAMF0 ||
 		c.TypeID == av.TAG_SCRIPTDATAAMF3 {
 		var err error
@@ -336,7 +338,7 @@ func (connServer *ConnServer) Flush() error {
 	return connServer.conn.Flush()
 }
 
-func (connServer *ConnServer) Read(c *ChunkStream) (err error) {
+func (connServer *ConnServer) Read(c *chunkstream.ChunkStream) (err error) {
 	return connServer.conn.Read(c)
 }
 

@@ -2,26 +2,18 @@ package core
 
 import (
 	"encoding/binary"
+	"github.com/zhyoulun/livego/protocol/rtmp/c"
+	"github.com/zhyoulun/livego/protocol/rtmp/chunkstream"
+	"github.com/zhyoulun/livego/protocol/rtmp/message"
 	"github.com/zhyoulun/livego/utils/mio"
 	"net"
 	"time"
 
-	"github.com/zhyoulun/livego/utils/pio"
 	"github.com/zhyoulun/livego/utils/pool"
 )
 
-const (
-	_ = iota
-	idSetChunkSize
-	idAbortMessage
-	idAck
-	idUserControlMessages
-	idWindowAckSize
-	idSetPeerBandwidth
-)
-
 type Conn struct {
-	net.Conn
+	Conn                net.Conn
 	chunkSize           uint32
 	remoteChunkSize     uint32
 	windowAckSize       uint32
@@ -30,7 +22,7 @@ type Conn struct {
 	ackReceived         uint32
 	rw                  *mio.ReadWriter
 	pool                *pool.Pool
-	chunks              map[uint32]ChunkStream
+	chunkStreams        map[uint32]chunkstream.ChunkStream
 }
 
 func NewConn(c net.Conn, bufferSize int) *Conn {
@@ -42,45 +34,45 @@ func NewConn(c net.Conn, bufferSize int) *Conn {
 		remoteWindowAckSize: 2500000,
 		pool:                pool.NewPool(),
 		rw:                  mio.NewReadWriter(c, bufferSize),
-		chunks:              make(map[uint32]ChunkStream),
+		chunkStreams:        make(map[uint32]chunkstream.ChunkStream),
 	}
 }
 
-func (conn *Conn) Read(c *ChunkStream) error {
+func (conn *Conn) Read(c *chunkstream.ChunkStream) error {
 	for {
 		h, _ := conn.rw.ReadUintBE(1)
 		format := h >> 6
-		csid := h & 0x3f
-		cs, ok := conn.chunks[csid]
+		csID := h & 0x3f
+		cs, ok := conn.chunkStreams[csID]
 		if !ok {
-			cs = ChunkStream{}
-			conn.chunks[csid] = cs
+			cs = chunkstream.ChunkStream{}
+			conn.chunkStreams[csID] = cs
 		}
-		cs.tmpFromat = format
-		cs.CSID = csid
+		cs.TmpFormat = format
+		cs.CSID = csID
 		err := cs.ReadChunk(conn.rw, conn.remoteChunkSize, conn.pool)
 		if err != nil {
 			return err
 		}
-		conn.chunks[csid] = cs
+		conn.chunkStreams[csID] = cs
 		if cs.Full() {
 			*c = cs
 			break
 		}
 	}
 
-	conn.handleControlMsg(c)
+	conn.handleProtocolControlMessage(c)
 
 	conn.ack(c.Length)
 
 	return nil
 }
 
-func (conn *Conn) Write(c *ChunkStream) error {
-	if c.TypeID == idSetChunkSize {
-		conn.chunkSize = binary.BigEndian.Uint32(c.Data)
+func (conn *Conn) Write(cs *chunkstream.ChunkStream) error {
+	if cs.TypeID == c.IDSetChunkSize {
+		conn.chunkSize = binary.BigEndian.Uint32(cs.Data)
 	}
-	return c.WriteChunk(conn.rw, int(conn.chunkSize))
+	return cs.WriteChunk(conn.rw, int(conn.chunkSize))
 }
 
 func (conn *Conn) Flush() error {
@@ -103,56 +95,25 @@ func (conn *Conn) SetDeadline(t time.Time) error {
 	return conn.Conn.SetDeadline(t)
 }
 
-func (conn *Conn) NewAck(size uint32) ChunkStream {
-	return initControlMsg(idAck, 4, size)
-}
-
-func (conn *Conn) NewSetChunkSize(size uint32) ChunkStream {
-	return initControlMsg(idSetChunkSize, 4, size)
-}
-
-func (conn *Conn) NewWindowAckSize(size uint32) ChunkStream {
-	return initControlMsg(idWindowAckSize, 4, size)
-}
-
-func (conn *Conn) NewSetPeerBandwidth(size uint32) ChunkStream {
-	ret := initControlMsg(idSetPeerBandwidth, 5, size)
-	ret.Data[4] = 2
-	return ret
-}
-
-func (conn *Conn) handleControlMsg(c *ChunkStream) {
-	if c.TypeID == idSetChunkSize {
-		conn.remoteChunkSize = binary.BigEndian.Uint32(c.Data)
-	} else if c.TypeID == idWindowAckSize {
-		conn.remoteWindowAckSize = binary.BigEndian.Uint32(c.Data)
+func (conn *Conn) handleProtocolControlMessage(cs *chunkstream.ChunkStream) {
+	if cs.TypeID == c.IDSetChunkSize {
+		conn.remoteChunkSize = binary.BigEndian.Uint32(cs.Data)
+	} else if cs.TypeID == c.IDWindowAckSize {
+		conn.remoteWindowAckSize = binary.BigEndian.Uint32(cs.Data)
 	}
 }
 
 func (conn *Conn) ack(size uint32) {
-	conn.received += uint32(size)
-	conn.ackReceived += uint32(size)
+	conn.received += size
+	conn.ackReceived += size
 	if conn.received >= 0xf0000000 {
 		conn.received = 0
 	}
 	if conn.ackReceived >= conn.remoteWindowAckSize {
-		cs := conn.NewAck(conn.ackReceived)
+		cs := message.NewAck(conn.ackReceived)
 		cs.WriteChunk(conn.rw, int(conn.chunkSize))
 		conn.ackReceived = 0
 	}
-}
-
-func initControlMsg(id, size, value uint32) ChunkStream {
-	ret := ChunkStream{
-		Format:   0,
-		CSID:     2,
-		TypeID:   id,
-		StreamID: 0,
-		Length:   size,
-		Data:     make([]byte, size),
-	}
-	pio.PutU32BE(ret.Data[:size], value)
-	return ret
 }
 
 const (
@@ -165,30 +126,8 @@ const (
 	pingResponse     uint32 = 7
 )
 
-/*
-   +------------------------------+-------------------------
-   |     Event Type ( 2- bytes )  | Event Data
-   +------------------------------+-------------------------
-   Pay load for the ‘User Control Message’.
-*/
-func (conn *Conn) userControlMsg(eventType, buflen uint32) ChunkStream {
-	var ret ChunkStream
-	buflen += 2
-	ret = ChunkStream{
-		Format:   0,
-		CSID:     2,
-		TypeID:   4,
-		StreamID: 1,
-		Length:   buflen,
-		Data:     make([]byte, buflen),
-	}
-	ret.Data[0] = byte(eventType >> 8 & 0xff)
-	ret.Data[1] = byte(eventType & 0xff)
-	return ret
-}
-
 func (conn *Conn) SetBegin() {
-	ret := conn.userControlMsg(streamBegin, 4)
+	ret := message.NewUserControlMessage(streamBegin, 4)
 	for i := 0; i < 4; i++ {
 		ret.Data[2+i] = byte(1 >> uint32((3-i)*8) & 0xff)
 	}
@@ -196,7 +135,7 @@ func (conn *Conn) SetBegin() {
 }
 
 func (conn *Conn) SetRecorded() {
-	ret := conn.userControlMsg(streamIsRecorded, 4)
+	ret := message.NewUserControlMessage(streamIsRecorded, 4)
 	for i := 0; i < 4; i++ {
 		ret.Data[2+i] = byte(1 >> uint32((3-i)*8) & 0xff)
 	}

@@ -2,6 +2,7 @@ package rtmp
 
 import (
 	"fmt"
+	"github.com/zhyoulun/livego/protocol/rtmp/chunkstream"
 	"github.com/zhyoulun/livego/utils"
 	"net"
 	"net/url"
@@ -99,8 +100,8 @@ type GetInFo interface {
 type StreamReadWriteCloser interface {
 	GetInFo
 	Close(error)
-	Write(core.ChunkStream) error
-	Read(c *core.ChunkStream) error
+	Write(chunkstream.ChunkStream) error
+	Read(c *chunkstream.ChunkStream) error
 	Flush() error
 }
 
@@ -170,7 +171,7 @@ func (v *VirWriter) SaveStatics(streamid uint32, length uint64, isVideoFlag bool
 }
 
 func (v *VirWriter) Check() {
-	var c core.ChunkStream
+	var c chunkstream.ChunkStream
 	for {
 		if err := v.conn.Read(&c); err != nil {
 			v.Close(err)
@@ -233,7 +234,7 @@ func (v *VirWriter) Write(p *av.Packet) (err error) {
 }
 
 func (v *VirWriter) SendPacket() error {
-	var cs core.ChunkStream
+	var cs chunkstream.ChunkStream
 	for {
 		p, ok := <-v.packetQueue
 		if ok {
@@ -346,7 +347,7 @@ func (v *VirReader) Read(p *av.Packet) (err error) {
 	v.SetPreTime("read")
 
 	//get chunk stream
-	var cs core.ChunkStream
+	var cs chunkstream.ChunkStream
 	for {
 		err = v.conn.Read(&cs)
 		if err != nil {

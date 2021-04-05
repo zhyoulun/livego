@@ -1,16 +1,16 @@
-package core
+package chunkstream
 
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/zhyoulun/livego/utils/mio"
-
 	"github.com/zhyoulun/livego/av"
+	"github.com/zhyoulun/livego/utils/mio"
 	"github.com/zhyoulun/livego/utils/pool"
 )
 
 type ChunkStream struct {
 	Format    uint32
+	TmpFormat uint32
 	CSID      uint32
 	Timestamp uint32
 	Length    uint32
@@ -21,7 +21,6 @@ type ChunkStream struct {
 	index     uint32
 	remain    uint32
 	got       bool
-	tmpFromat uint32
 	Data      []byte
 }
 
@@ -122,8 +121,8 @@ func (cs *ChunkStream) WriteChunk(w *mio.ReadWriter, chunkSize int) error {
 }
 
 func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool.Pool) error {
-	if cs.remain != 0 && cs.tmpFromat != 3 {
-		return fmt.Errorf("inlaid remin = %d", cs.remain)
+	if cs.remain != 0 && cs.TmpFormat != 3 {
+		return fmt.Errorf("inlaid remain = %d", cs.remain)
 	}
 	switch cs.CSID {
 	case 0:
@@ -134,9 +133,9 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		cs.CSID = id + 64
 	}
 
-	switch cs.tmpFromat {
+	switch cs.TmpFormat {
 	case 0:
-		cs.Format = cs.tmpFromat
+		cs.Format = cs.TmpFormat
 		cs.Timestamp, _ = r.ReadUintBE(3)
 		cs.Length, _ = r.ReadUintBE(3)
 		cs.TypeID, _ = r.ReadUintBE(1)
@@ -149,7 +148,7 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		}
 		cs.new(pool)
 	case 1:
-		cs.Format = cs.tmpFromat
+		cs.Format = cs.TmpFormat
 		timeStamp, _ := r.ReadUintBE(3)
 		cs.Length, _ = r.ReadUintBE(3)
 		cs.TypeID, _ = r.ReadUintBE(1)
@@ -163,7 +162,7 @@ func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool
 		cs.Timestamp += timeStamp
 		cs.new(pool)
 	case 2:
-		cs.Format = cs.tmpFromat
+		cs.Format = cs.TmpFormat
 		timeStamp, _ := r.ReadUintBE(3)
 		if timeStamp == 0xffffff {
 			timeStamp, _ = r.ReadUintBE(4)
