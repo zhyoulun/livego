@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/zhyoulun/livego/utils/mio"
 
 	"github.com/zhyoulun/livego/av"
 	"github.com/zhyoulun/livego/utils/pool"
@@ -24,93 +25,93 @@ type ChunkStream struct {
 	Data      []byte
 }
 
-func (chunkStream *ChunkStream) full() bool {
-	return chunkStream.got
+func (cs *ChunkStream) new(pool *pool.Pool) {
+	cs.got = false
+	cs.index = 0
+	cs.remain = cs.Length
+	cs.Data = pool.Get(int(cs.Length))
 }
 
-func (chunkStream *ChunkStream) new(pool *pool.Pool) {
-	chunkStream.got = false
-	chunkStream.index = 0
-	chunkStream.remain = chunkStream.Length
-	chunkStream.Data = pool.Get(int(chunkStream.Length))
-}
-
-func (chunkStream *ChunkStream) writeHeader(w *ReadWriter) error {
+func (cs *ChunkStream) writeHeader(w *mio.ReadWriter) error {
 	//Chunk Basic Header
-	h := chunkStream.Format << 6
+	h := cs.Format << 6
 	switch {
-	case chunkStream.CSID < 64:
-		h |= chunkStream.CSID
+	case cs.CSID < 64:
+		h |= cs.CSID
 		w.WriteUintBE(h, 1)
-	case chunkStream.CSID-64 < 256:
+	case cs.CSID-64 < 256:
 		h |= 0
 		w.WriteUintBE(h, 1)
-		w.WriteUintLE(chunkStream.CSID-64, 1)
-	case chunkStream.CSID-64 < 65536:
+		w.WriteUintLE(cs.CSID-64, 1)
+	case cs.CSID-64 < 65536:
 		h |= 1
 		w.WriteUintBE(h, 1)
-		w.WriteUintLE(chunkStream.CSID-64, 2)
+		w.WriteUintLE(cs.CSID-64, 2)
 	}
 	//Chunk Message Header
-	ts := chunkStream.Timestamp
-	if chunkStream.Format == 3 {
+	ts := cs.Timestamp
+	if cs.Format == 3 {
 		goto END
 	}
-	if chunkStream.Timestamp > 0xffffff {
+	if cs.Timestamp > 0xffffff {
 		ts = 0xffffff
 	}
 	w.WriteUintBE(ts, 3)
-	if chunkStream.Format == 2 {
+	if cs.Format == 2 {
 		goto END
 	}
-	if chunkStream.Length > 0xffffff {
-		return fmt.Errorf("length=%d", chunkStream.Length)
+	if cs.Length > 0xffffff {
+		return fmt.Errorf("length=%d", cs.Length)
 	}
-	w.WriteUintBE(chunkStream.Length, 3)
-	w.WriteUintBE(chunkStream.TypeID, 1)
-	if chunkStream.Format == 1 {
+	w.WriteUintBE(cs.Length, 3)
+	w.WriteUintBE(cs.TypeID, 1)
+	if cs.Format == 1 {
 		goto END
 	}
-	w.WriteUintLE(chunkStream.StreamID, 4)
+	w.WriteUintLE(cs.StreamID, 4)
 END:
 	//Extended Timestamp
 	if ts >= 0xffffff {
-		w.WriteUintBE(chunkStream.Timestamp, 4)
+		w.WriteUintBE(cs.Timestamp, 4)
 	}
 	return w.WriteError()
 }
 
-func (chunkStream *ChunkStream) writeChunk(w *ReadWriter, chunkSize int) error {
-	if chunkStream.TypeID == av.TAG_AUDIO {
-		chunkStream.CSID = 4
-	} else if chunkStream.TypeID == av.TAG_VIDEO ||
-		chunkStream.TypeID == av.TAG_SCRIPTDATAAMF0 ||
-		chunkStream.TypeID == av.TAG_SCRIPTDATAAMF3 {
-		chunkStream.CSID = 6
+func (cs *ChunkStream) Full() bool {
+	return cs.got
+}
+
+func (cs *ChunkStream) WriteChunk(w *mio.ReadWriter, chunkSize int) error {
+	if cs.TypeID == av.TAG_AUDIO {
+		cs.CSID = 4
+	} else if cs.TypeID == av.TAG_VIDEO ||
+		cs.TypeID == av.TAG_SCRIPTDATAAMF0 ||
+		cs.TypeID == av.TAG_SCRIPTDATAAMF3 {
+		cs.CSID = 6
 	}
 
 	totalLen := uint32(0)
-	numChunks := (chunkStream.Length / uint32(chunkSize))
+	numChunks := cs.Length / uint32(chunkSize)
 	for i := uint32(0); i <= numChunks; i++ {
-		if totalLen == chunkStream.Length {
+		if totalLen == cs.Length {
 			break
 		}
 		if i == 0 {
-			chunkStream.Format = uint32(0)
+			cs.Format = uint32(0)
 		} else {
-			chunkStream.Format = uint32(3)
+			cs.Format = uint32(3)
 		}
-		if err := chunkStream.writeHeader(w); err != nil {
+		if err := cs.writeHeader(w); err != nil {
 			return err
 		}
 		inc := uint32(chunkSize)
 		start := uint32(i) * uint32(chunkSize)
-		if uint32(len(chunkStream.Data))-start <= inc {
-			inc = uint32(len(chunkStream.Data)) - start
+		if uint32(len(cs.Data))-start <= inc {
+			inc = uint32(len(cs.Data)) - start
 		}
 		totalLen += inc
 		end := start + inc
-		buf := chunkStream.Data[start:end]
+		buf := cs.Data[start:end]
 		if _, err := w.Write(buf); err != nil {
 			return err
 		}
@@ -120,106 +121,106 @@ func (chunkStream *ChunkStream) writeChunk(w *ReadWriter, chunkSize int) error {
 
 }
 
-func (chunkStream *ChunkStream) readChunk(r *ReadWriter, chunkSize uint32, pool *pool.Pool) error {
-	if chunkStream.remain != 0 && chunkStream.tmpFromat != 3 {
-		return fmt.Errorf("inlaid remin = %d", chunkStream.remain)
+func (cs *ChunkStream) ReadChunk(r *mio.ReadWriter, chunkSize uint32, pool *pool.Pool) error {
+	if cs.remain != 0 && cs.tmpFromat != 3 {
+		return fmt.Errorf("inlaid remin = %d", cs.remain)
 	}
-	switch chunkStream.CSID {
+	switch cs.CSID {
 	case 0:
 		id, _ := r.ReadUintLE(1)
-		chunkStream.CSID = id + 64
+		cs.CSID = id + 64
 	case 1:
 		id, _ := r.ReadUintLE(2)
-		chunkStream.CSID = id + 64
+		cs.CSID = id + 64
 	}
 
-	switch chunkStream.tmpFromat {
+	switch cs.tmpFromat {
 	case 0:
-		chunkStream.Format = chunkStream.tmpFromat
-		chunkStream.Timestamp, _ = r.ReadUintBE(3)
-		chunkStream.Length, _ = r.ReadUintBE(3)
-		chunkStream.TypeID, _ = r.ReadUintBE(1)
-		chunkStream.StreamID, _ = r.ReadUintLE(4)
-		if chunkStream.Timestamp == 0xffffff {
-			chunkStream.Timestamp, _ = r.ReadUintBE(4)
-			chunkStream.exted = true
+		cs.Format = cs.tmpFromat
+		cs.Timestamp, _ = r.ReadUintBE(3)
+		cs.Length, _ = r.ReadUintBE(3)
+		cs.TypeID, _ = r.ReadUintBE(1)
+		cs.StreamID, _ = r.ReadUintLE(4)
+		if cs.Timestamp == 0xffffff {
+			cs.Timestamp, _ = r.ReadUintBE(4)
+			cs.exted = true
 		} else {
-			chunkStream.exted = false
+			cs.exted = false
 		}
-		chunkStream.new(pool)
+		cs.new(pool)
 	case 1:
-		chunkStream.Format = chunkStream.tmpFromat
+		cs.Format = cs.tmpFromat
 		timeStamp, _ := r.ReadUintBE(3)
-		chunkStream.Length, _ = r.ReadUintBE(3)
-		chunkStream.TypeID, _ = r.ReadUintBE(1)
+		cs.Length, _ = r.ReadUintBE(3)
+		cs.TypeID, _ = r.ReadUintBE(1)
 		if timeStamp == 0xffffff {
 			timeStamp, _ = r.ReadUintBE(4)
-			chunkStream.exted = true
+			cs.exted = true
 		} else {
-			chunkStream.exted = false
+			cs.exted = false
 		}
-		chunkStream.timeDelta = timeStamp
-		chunkStream.Timestamp += timeStamp
-		chunkStream.new(pool)
+		cs.timeDelta = timeStamp
+		cs.Timestamp += timeStamp
+		cs.new(pool)
 	case 2:
-		chunkStream.Format = chunkStream.tmpFromat
+		cs.Format = cs.tmpFromat
 		timeStamp, _ := r.ReadUintBE(3)
 		if timeStamp == 0xffffff {
 			timeStamp, _ = r.ReadUintBE(4)
-			chunkStream.exted = true
+			cs.exted = true
 		} else {
-			chunkStream.exted = false
+			cs.exted = false
 		}
-		chunkStream.timeDelta = timeStamp
-		chunkStream.Timestamp += timeStamp
-		chunkStream.new(pool)
+		cs.timeDelta = timeStamp
+		cs.Timestamp += timeStamp
+		cs.new(pool)
 	case 3:
-		if chunkStream.remain == 0 {
-			switch chunkStream.Format {
+		if cs.remain == 0 {
+			switch cs.Format {
 			case 0:
-				if chunkStream.exted {
+				if cs.exted {
 					timestamp, _ := r.ReadUintBE(4)
-					chunkStream.Timestamp = timestamp
+					cs.Timestamp = timestamp
 				}
 			case 1, 2:
 				var timedet uint32
-				if chunkStream.exted {
+				if cs.exted {
 					timedet, _ = r.ReadUintBE(4)
 				} else {
-					timedet = chunkStream.timeDelta
+					timedet = cs.timeDelta
 				}
-				chunkStream.Timestamp += timedet
+				cs.Timestamp += timedet
 			}
-			chunkStream.new(pool)
+			cs.new(pool)
 		} else {
-			if chunkStream.exted {
+			if cs.exted {
 				b, err := r.Peek(4)
 				if err != nil {
 					return err
 				}
 				tmpts := binary.BigEndian.Uint32(b)
-				if tmpts == chunkStream.Timestamp {
+				if tmpts == cs.Timestamp {
 					r.Discard(4)
 				}
 			}
 		}
 	default:
-		return fmt.Errorf("invalid format=%d", chunkStream.Format)
+		return fmt.Errorf("invalid format=%d", cs.Format)
 	}
-	size := int(chunkStream.remain)
+	size := int(cs.remain)
 	if size > int(chunkSize) {
 		size = int(chunkSize)
 	}
 
-	buf := chunkStream.Data[chunkStream.index : chunkStream.index+uint32(size)]
+	buf := cs.Data[cs.index : cs.index+uint32(size)]
 	if _, err := r.Read(buf); err != nil {
 		return err
 	}
-	chunkStream.index += uint32(size)
-	chunkStream.remain -= uint32(size)
-	if chunkStream.remain == 0 {
-		chunkStream.got = true
+	cs.index += uint32(size)
+	cs.remain -= uint32(size)
+	if cs.remain == 0 {
+		cs.got = true
 	}
 
-	return r.readError
+	return r.ReadError()
 }

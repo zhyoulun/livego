@@ -5,7 +5,6 @@ import (
 	"github.com/zhyoulun/livego/utils"
 	"net"
 	"net/url"
-	"reflect"
 	"strings"
 	"time"
 
@@ -102,6 +101,7 @@ type StreamReadWriteCloser interface {
 	Close(error)
 	Write(core.ChunkStream) error
 	Read(c *core.ChunkStream) error
+	Flush() error
 }
 
 type StaticsBW struct {
@@ -233,7 +233,6 @@ func (v *VirWriter) Write(p *av.Packet) (err error) {
 }
 
 func (v *VirWriter) SendPacket() error {
-	Flush := reflect.ValueOf(v.conn).MethodByName("Flush")
 	var cs core.ChunkStream
 	for {
 		p, ok := <-v.packetQueue
@@ -262,7 +261,7 @@ func (v *VirWriter) SendPacket() error {
 				v.closed = true
 				return err
 			}
-			Flush.Call(nil)
+			v.conn.Flush()
 		} else {
 			return fmt.Errorf("closed")
 		}

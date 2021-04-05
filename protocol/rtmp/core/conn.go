@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"github.com/zhyoulun/livego/utils/mio"
 	"net"
 	"time"
 
@@ -27,7 +28,7 @@ type Conn struct {
 	remoteWindowAckSize uint32
 	received            uint32
 	ackReceived         uint32
-	rw                  *ReadWriter
+	rw                  *mio.ReadWriter
 	pool                *pool.Pool
 	chunks              map[uint32]ChunkStream
 }
@@ -40,7 +41,7 @@ func NewConn(c net.Conn, bufferSize int) *Conn {
 		windowAckSize:       2500000,
 		remoteWindowAckSize: 2500000,
 		pool:                pool.NewPool(),
-		rw:                  NewReadWriter(c, bufferSize),
+		rw:                  mio.NewReadWriter(c, bufferSize),
 		chunks:              make(map[uint32]ChunkStream),
 	}
 }
@@ -48,10 +49,6 @@ func NewConn(c net.Conn, bufferSize int) *Conn {
 func (conn *Conn) Read(c *ChunkStream) error {
 	for {
 		h, _ := conn.rw.ReadUintBE(1)
-		// if err != nil {
-		// 	log.Println("read from conn error: ", err)
-		// 	return err
-		// }
 		format := h >> 6
 		csid := h & 0x3f
 		cs, ok := conn.chunks[csid]
@@ -61,12 +58,12 @@ func (conn *Conn) Read(c *ChunkStream) error {
 		}
 		cs.tmpFromat = format
 		cs.CSID = csid
-		err := cs.readChunk(conn.rw, conn.remoteChunkSize, conn.pool)
+		err := cs.ReadChunk(conn.rw, conn.remoteChunkSize, conn.pool)
 		if err != nil {
 			return err
 		}
 		conn.chunks[csid] = cs
-		if cs.full() {
+		if cs.Full() {
 			*c = cs
 			break
 		}
@@ -83,7 +80,7 @@ func (conn *Conn) Write(c *ChunkStream) error {
 	if c.TypeID == idSetChunkSize {
 		conn.chunkSize = binary.BigEndian.Uint32(c.Data)
 	}
-	return c.writeChunk(conn.rw, int(conn.chunkSize))
+	return c.WriteChunk(conn.rw, int(conn.chunkSize))
 }
 
 func (conn *Conn) Flush() error {
@@ -140,7 +137,7 @@ func (conn *Conn) ack(size uint32) {
 	}
 	if conn.ackReceived >= conn.remoteWindowAckSize {
 		cs := conn.NewAck(conn.ackReceived)
-		cs.writeChunk(conn.rw, int(conn.chunkSize))
+		cs.WriteChunk(conn.rw, int(conn.chunkSize))
 		conn.ackReceived = 0
 	}
 }
