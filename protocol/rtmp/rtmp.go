@@ -34,17 +34,15 @@ type Client struct {
 
 type Server struct {
 	handler av.Handler
-	//getter  av.GetWriter
 }
 
-func NewRtmpServer(h av.Handler, getter av.GetWriter) *Server {
+func NewRtmpServer(h av.Handler) *Server {
 	return &Server{
 		handler: h,
-		//getter:  getter,
 	}
 }
 
-func (s *Server) Serve(listener net.Listener) (err error) {
+func (s *Server) Serve(ln net.Listener) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("rtmp serve panic: ", r)
@@ -52,31 +50,35 @@ func (s *Server) Serve(listener net.Listener) (err error) {
 	}()
 
 	for {
-		var netconn net.Conn
-		netconn, err = listener.Accept()
+		var netConn net.Conn
+		netConn, err = ln.Accept()
 		if err != nil {
 			return
 		}
-		conn := core.NewConn(netconn, 4*1024)
-		log.Debug("new client, connect remote: ", conn.RemoteAddr().String(),
-			"local:", conn.LocalAddr().String())
-		go s.handleConn(conn)
+		rtmpConn := core.NewConn(netConn, 4*1024)
+		log.Debug("new client, connect remote: ", rtmpConn.RemoteAddr().String(),
+			"local:", rtmpConn.LocalAddr().String())
+		go s.handleConn(rtmpConn)
 	}
 }
 
-func (s *Server) handleConn(conn *core.Conn) error {
+func (s *Server) handleConn(conn *core.Conn) {
 	//握手
 	if err := conn.HandshakeServer(); err != nil {
-		conn.Close()
 		log.Error("handleConn HandshakeServer err: ", err)
-		return err
+		if err = conn.Close(); err != nil {
+			log.Error("conn Close err: ", err)
+		}
+		return
 	}
 	connServer := core.NewConnServer(conn)
 
 	if err := connServer.ReadMsg(); err != nil {
-		conn.Close()
 		log.Error("handleConn read msg err: ", err)
-		return err
+		if err = conn.Close(); err != nil {
+			log.Error("conn Close err: ", err)
+		}
+		return
 	}
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
@@ -89,8 +91,6 @@ func (s *Server) handleConn(conn *core.Conn) error {
 		log.Debugf("new player: %+v", writer.Info())
 		s.handler.HandleWriter(writer)
 	}
-
-	return nil
 }
 
 type GetInFo interface {

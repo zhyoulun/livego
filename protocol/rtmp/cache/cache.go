@@ -2,7 +2,6 @@ package cache
 
 import (
 	"github.com/zhyoulun/livego/av"
-	"github.com/zhyoulun/livego/configure"
 )
 
 type Cache struct {
@@ -14,7 +13,7 @@ type Cache struct {
 
 func NewCache() *Cache {
 	return &Cache{
-		gop:      NewGopCache(configure.Config.GetInt("gop_num")),
+		gop:      NewGopCache(1),
 		videoSeq: NewSpecialCache(),
 		audioSeq: NewSpecialCache(),
 		metadata: NewSpecialCache(),

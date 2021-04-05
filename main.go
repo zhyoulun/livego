@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/zhyoulun/livego/configure"
 	"github.com/zhyoulun/livego/protocol/api"
 	"github.com/zhyoulun/livego/protocol/rtmp"
 	"net"
@@ -17,17 +16,17 @@ var VERSION = "master"
 
 var rtmpAddr string
 
-func startRtmp(stream *rtmp.RtmpStream) {
-	rtmpAddr = configure.Config.GetString("rtmp_addr")
+func startRtmp(stream *rtmp.StreamManager) {
+	rtmpAddr = "127.0.0.1:1935"
 
-	rtmpListen, err := net.Listen("tcp", rtmpAddr)
+	ln, err := net.Listen("tcp", rtmpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var rtmpServer *rtmp.Server
 
-	rtmpServer = rtmp.NewRtmpServer(stream, nil)
+	rtmpServer = rtmp.NewRtmpServer(stream)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -35,44 +34,48 @@ func startRtmp(stream *rtmp.RtmpStream) {
 		}
 	}()
 	log.Info("RTMP Listen On ", rtmpAddr)
-	rtmpServer.Serve(rtmpListen)
+	log.Errorf("rtmpServer Serve err: %+v", rtmpServer.Serve(ln))
 }
 
-func startAPI(stream *rtmp.RtmpStream) {
-	apiAddr := configure.Config.GetString("api_addr")
+func startAPI(stream *rtmp.StreamManager) {
+	apiAddr := "127.0.0.1:8080"
 
-	if apiAddr != "" {
-		opListen, err := net.Listen("tcp", apiAddr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		opServer := api.NewServer(stream, rtmpAddr)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Error("HTTP-API server panic: ", r)
-				}
-			}()
-			log.Info("HTTP-API listen On ", apiAddr)
-			opServer.Serve(opListen)
-		}()
+	ln, err := net.Listen("tcp", apiAddr)
+	if err != nil {
+		log.Fatal(err)
 	}
+	apiServer := api.NewServer(stream, rtmpAddr)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("HTTP-API server panic: ", r)
+			}
+		}()
+		log.Info("HTTP-API listen On ", apiAddr)
+		log.Errorf("apiServer Serve err: %+v", apiServer.Serve(ln))
+	}()
 }
 
-func Init() {
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
-			filename := path.Base(f.File)
-			return fmt.Sprintf("%s()", f.Function), fmt.Sprintf(" %s:%d", filename, f.Line)
-		},
-	})
-	log.SetLevel(log.DebugLevel) //打开debug日志开关
+func Init() error {
+	{
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp: true,
+			CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+				filename := path.Base(f.File)
+				return fmt.Sprintf("%s()", f.Function), fmt.Sprintf(" %s:%d", filename, f.Line)
+			},
+		})
+		log.SetLevel(log.DebugLevel) //打开debug日志开关
+		log.SetReportCaller(true)    //在输出日志中添加文件名和方法信息
+	}
+
+	return nil
 }
 
 func main() {
-	Init()
-	configure.Init()
+	if err := Init(); err != nil {
+		panic(err)
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -81,16 +84,7 @@ func main() {
 		}
 	}()
 
-	log.Infof(`
-     _     _            ____       
-    | |   (_)_   _____ / ___| ___  
-    | |   | \ \ / / _ \ |  _ / _ \ 
-    | |___| |\ V /  __/ |_| | (_) |
-    |_____|_| \_/ \___|\____|\___/ 
-        version: %s
-	`, VERSION)
-
-	stream := rtmp.NewRtmpStream()
+	stream := rtmp.NewStreamManager()
 	startAPI(stream)
 
 	startRtmp(stream)
