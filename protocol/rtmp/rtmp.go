@@ -22,8 +22,6 @@ const (
 )
 
 var (
-	//readTimeout  = configure.Config.GetInt("read_timeout")
-	//writeTimeout = configure.Config.GetInt("write_timeout")
 	writeTimeout = 1 //读写数据的超时时间，这里设置为1s
 )
 

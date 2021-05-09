@@ -93,6 +93,9 @@ func (cs *ChunkStream) WriteChunk(w *mio.ReadWriter, chunkSize int) error {
 	totalLen := uint32(0)
 	numChunks := cs.Length / uint32(chunkSize)
 	for i := uint32(0); i <= numChunks; i++ {
+		if numChunks > 0 {
+			_ = chunkSize
+		}
 		if totalLen == cs.Length {
 			break
 		}

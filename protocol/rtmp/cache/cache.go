@@ -66,9 +66,9 @@ func (cache *Cache) Send(w av.WriteCloser) error {
 		return err
 	}
 
-	if err := cache.gop.Send(w); err != nil {
-		return err
-	}
+	//if err := cache.gop.Send(w); err != nil {
+	//	return err
+	//}
 
 	return nil
 }
